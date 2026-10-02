@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import ReactDOM from 'react-dom/client'
-import { Menu, X, ArrowUpRight, CalendarDays, MapPin, Mail } from 'lucide-react'
+import { Menu, X, ArrowUpRight, CalendarDays, MapPin, Mail, Megaphone } from 'lucide-react'
 import { conferenceData, type Language } from './data/conference'
 import './styles/global.css'
 
@@ -12,6 +12,7 @@ import logoAnwar from './assets/logos/al-anwar-center.png'
 import aiMcs from './assets/branding/ai-mcs.png'
 import campus from './assets/images/campus-latest.jpeg'
 import qr from './assets/images/contact-qr.png'
+import announcementBanner from './assets/images/conference-announcement-banner.png'
 
 const organizations = [
   { src: logoAnwar, alt: 'Al-Anwar Center for Development and Education' },
@@ -25,8 +26,11 @@ function App() {
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('conference-language') as Language) || 'en')
   const [menuOpen, setMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [announcementOpen, setAnnouncementOpen] = useState(false)
   const menuRef = useRef<HTMLElement>(null)
   const menuToggleRef = useRef<HTMLButtonElement>(null)
+  const announcementTriggerRef = useRef<HTMLButtonElement>(null)
+  const announcementDialogRef = useRef<HTMLDivElement>(null)
   const t = conferenceData[lang]
 
   useEffect(() => {
@@ -55,6 +59,42 @@ function App() {
     return () => document.removeEventListener('pointerdown', handlePointerDown)
   }, [menuOpen])
 
+  useEffect(() => {
+    if (!announcementOpen) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const focusTimer = window.setTimeout(() => announcementDialogRef.current?.querySelector<HTMLElement>('.announcement-close')?.focus(), 0)
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setAnnouncementOpen(false)
+        return
+      }
+
+      if (event.key !== 'Tab' || !announcementDialogRef.current) return
+      const focusable = Array.from(announcementDialogRef.current.querySelectorAll<HTMLElement>('button, [href], [tabindex]:not([tabindex="-1"])'))
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.clearTimeout(focusTimer)
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', handleKeyDown)
+      announcementTriggerRef.current?.focus()
+    }
+  }, [announcementOpen])
+
   const switchLanguage = (next: Language) => { setLang(next); setMenuOpen(false) }
   const navItems: Array<[string, string]> = [
     ['home', t.nav.home], ['overview', t.nav.overview],
@@ -64,11 +104,20 @@ function App() {
 
   return (
     <div className={`site-shell ${lang === 'ar' ? 'arabic' : ''}`}>
+      <button ref={announcementTriggerRef} className="announcement-bar" type="button" style={{ backgroundImage: `url(${announcementBanner})` }} onClick={() => setAnnouncementOpen(true)}>
+        <span className="announcement-icon" aria-hidden="true"><Megaphone /></span>
+        <span className="announcement-copy">
+          <strong>{lang === 'ar' ? 'إعلان المؤتمر' : 'Conference Announcement'}</strong>
+          <span className="announcement-title">{lang === 'ar' ? 'المؤتمر العلمي الدولي الثامن عشر' : '18th International Scientific Conference'}</span>
+          <small className="announcement-date">{lang === 'ar' ? '26–27 تشرين الثاني 2026' : 'November 26–27, 2026'}</small>
+        </span>
+        <ArrowUpRight className="announcement-arrow" aria-hidden="true" />
+      </button>
       <header className={`site-header ${scrolled ? 'is-scrolled' : ''}`}>
         <div className="container header-inner">
           <a className="brand" href="#home" aria-label="MCS AI Conference home">
             <img src={aiMcs} alt="AI MCS" />
-            <span><b>18<sup>th</sup></b><small>International Scientific Conference</small></span>
+            <span className="brand-name">Intelligent Modelling, Control, and Simulation</span>
           </a>
           <button ref={menuToggleRef} className="menu-toggle" aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X /> : <Menu />}</button>
           <nav ref={menuRef} className={`nav-links ${menuOpen ? 'open' : ''}`} aria-label="Primary navigation">
@@ -83,6 +132,21 @@ function App() {
         </div>
       </header>
 
+      {announcementOpen && (
+        <div className="announcement-modal" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setAnnouncementOpen(false) }}>
+          <div ref={announcementDialogRef} className="announcement-dialog" role="dialog" aria-modal="true" aria-labelledby="announcement-title">
+            <button className="announcement-close" type="button" aria-label={lang === 'ar' ? 'إغلاق الإعلان' : 'Close announcement'} onClick={() => setAnnouncementOpen(false)}><X aria-hidden="true" /></button>
+            <p className="announcement-kicker">{lang === 'ar' ? 'دعوة للمشاركة' : 'Save the date'}</p>
+            <h2 id="announcement-title">{lang === 'ar' ? 'المؤتمر العلمي الدولي الثامن عشر' : '18th International Scientific Conference'}</h2>
+            <p className="announcement-theme">{lang === 'ar' ? 'الرياضيات والذكاء الاصطناعي: من أسس المعرفة إلى آفاق الابتكار' : 'Mathematics and Artificial Intelligence: From the Foundations of Knowledge to the Horizons of Innovation'}</p>
+            <div className="announcement-details">
+              <div><CalendarDays aria-hidden="true" /><span>{lang === 'ar' ? '26–27 تشرين الثاني 2026' : 'November 26–27, 2026'}</span></div>
+              <div><MapPin aria-hidden="true" /><span>{lang === 'ar' ? 'الجامعة اللبنانية – مجمع الحدث، بيروت، لبنان' : 'Lebanese University – Hadath Campus, Beirut, Lebanon'}</span></div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main>
         <section id="home" className="hero">
           <div className="hero-photo-clip">
@@ -91,6 +155,7 @@ function App() {
           <div className="hero-branding" aria-label="Lebanese University brand statement">
             <p>A UNIVERSITY FOR A BRIGHTER TOMORROW</p>
             <div className="hero-branding-subline"><span />KNOWLEDGE | INNOVATION | IMPACT<span /></div>
+            <p className="hero-branding-theme">{lang === 'ar' ? 'الرياضيات والذكاء الاصطناعي: من أسس المعرفة إلى آفاق الابتكار' : 'Mathematics and Artificial Intelligence: From the Foundations of Knowledge to the Horizons of Innovation'}</p>
             <div className="hero-scroll-indicator" aria-hidden="true">↓</div>
           </div>
         </section>
